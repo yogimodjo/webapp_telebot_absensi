@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Absensi Pegawai</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Absensi Pegawai Retha Print</h1>
+      <p>Silakan pilih opsi absensi Anda.</p>
+      <div class="action-buttons">
+        <button id="checkInBtn" class="btn primary">Masuk</button>
+        <button id="checkOutBtn" class="btn secondary">Pulang</button>
+      </div>
+      <p id="status-message"></p>
+      <footer>
+        <small>PT. Retha Gemilang Lestari © 2025</small>
+      </footer>
+    </div>
+
+    <script>
+      const tg = window.Telegram.WebApp;
+      const checkInBtn = document.getElementById("checkInBtn");
+      const checkOutBtn = document.getElementById("checkOutBtn");
+      const statusMessage = document.getElementById("status-message");
+
+      const n8nWebhookUrl = "https://your-n8n-webhook-url.com/webhook-path";
+
+      tg.ready();
+
+      const userId = tg.initDataUnsafe?.user?.id;
+      if (!userId) {
+        statusMessage.textContent = "Gagal mengambil User ID.";
+      }
+
+      function requestLocation() {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              };
+              localStorage.setItem("user_location", JSON.stringify(location));
+            },
+            (error) => {
+              statusMessage.textContent = "Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.";
+            }
+          );
+        } else {
+          statusMessage.textContent = "Geolocation tidak didukung oleh browser Anda.";
+        }
+      }
+
+      requestLocation();
+
+      checkInBtn.addEventListener("click", () => {
+        sendData("Check-In");
+      });
+
+      checkOutBtn.addEventListener("click", () => {
+        sendData("Check-Out");
+      });
+
+      async function sendData(type) {
+        statusMessage.textContent = "Mengirim data...";
+        const locationData = JSON.parse(localStorage.getItem("user_location"));
+
+        if (!locationData) {
+          statusMessage.textContent = "Lokasi belum tersedia. Mohon tunggu atau coba lagi.";
+          return;
+        }
+
+        const data = {
+          user_id: userId,
+          device_id: navigator.userAgent,
+          type: type,
+          location: locationData,
+          timestamp: new Date().toISOString(),
+        };
+
+        try {
+          const response = await fetch(n8nWebhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
+
+          if (response.ok) {
+            statusMessage.textContent = `${type} berhasil dicatat. Aplikasi akan ditutup...`;
+            setTimeout(() => {
+              tg.close();
+            }, 1500);
+          } else {
+            statusMessage.textContent = `Gagal mengirim data. Status: ${response.status}`;
+          }
+        } catch (error) {
+          statusMessage.textContent = "Terjadi kesalahan jaringan. Silakan coba lagi.";
+        }
+      }
+    </script>
+  </body>
+</html>
